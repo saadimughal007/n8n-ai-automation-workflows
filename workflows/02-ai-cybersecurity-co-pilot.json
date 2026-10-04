@@ -1,0 +1,594 @@
+{
+  "name": "AI Cyber Security Co-Pilot",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cyber_co_pilot",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1792,
+        -512
+      ],
+      "id": "2c45b51d-40d5-44bd-be26-6159a939f53a",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7f91d1b3-ca50-4572-83f7-9d8b9561e653",
+              "name": "input_type",
+              "value": "={{ $json.body.type }}",
+              "type": "string"
+            },
+            {
+              "id": "ec3443ae-8e6c-4909-890e-8731cd5b9aef",
+              "name": "content",
+              "value": "={{ $json.body.content }}",
+              "type": "string"
+            },
+            {
+              "id": "0006fb44-0956-47c6-9a73-30cbcd2ed149",
+              "name": "source",
+              "value": "={{ $json.body.source }}",
+              "type": "string"
+            },
+            {
+              "id": "20968b1f-0c16-4553-a1dd-f2a4e167c72b",
+              "name": "timestamp",
+              "value": "={{ $json.body.timestamp }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1616,
+        -512
+      ],
+      "id": "f29fe5c2-e2e7-442a-a398-1f0b6e4d8808",
+      "name": "Data Normalize"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.virustotal.com/api/v3/urls",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-apikey",
+              "value": "={{ $env.VIRUSTOTAL_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $json.content }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1424,
+        -512
+      ],
+      "id": "0e278fad-714f-411a-bc0a-69da745f9380",
+      "name": "VirusTotal API"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.virustotal.com/api/v3/analyses/{{ $json.data.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-apikey",
+              "value": "={{ $env.VIRUSTOTAL_API_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1776,
+        -176
+      ],
+      "id": "cc4800da-a03f-479b-9d71-5e2680913100",
+      "name": "Get Results"
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1200,
+        -496
+      ],
+      "id": "48c4d10b-b285-4a62-a8fe-0fc8a53a4dc1",
+      "name": "Wait"
+    },
+    {
+      "parameters": {
+        "jsCode": "const vtData = $input.first().json;\nconst stats = vtData?.data?.attributes?.stats || {};\nconst prevData = $('Data Normalize').first().json;\n\nreturn [{\n  json: {\n    input_type: prevData.input_type,\n    content: prevData.content,\n    source: prevData.source,\n    timestamp: prevData.timestamp,\n    vt_malicious: stats.malicious || 0,\n    vt_suspicious: stats.suspicious || 0,\n    vt_harmless: stats.harmless || 0,\n    vt_undetected: stats.undetected || 0,\n    vt_raw: JSON.stringify(stats)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1600,
+        -176
+      ],
+      "id": "c3318d89-34c5-4642-9c4b-82e22a8c9d2f",
+      "name": "VT Data Extract"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.GROQ_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a cybersecurity analyst. Analyze the provided threat evidence conservatively. Do not claim certainty beyond the evidence.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Analyze this threat:\\n\\nTYPE: {{ $json.input_type }}\\nCONTENT: {{ $json.content }}\\nVT Malicious: {{ $json.vt_malicious }}\\nVT Suspicious: {{ $json.vt_suspicious }}\\n\\nReturn ONLY JSON:\\n{\\n  \\\"classification\\\": \\\"Safe | Suspicious | High Risk\\\",\\n  \\\"phishing_indicators\\\": [],\\n  \\\"intent\\\": \\\"one sentence\\\",\\n  \\\"confidence\\\": 0.0,\\n  \\\"reasoning\\\": \\\"brief\\\"\\n}\"\n    }\n  ],\n  \"temperature\": 0.1\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1408,
+        -176
+      ],
+      "id": "15403437-c929-426d-8362-5705820cddb5",
+      "name": "Groq API"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst rawText = response?.choices?.[0]?.message?.content || \"\";\n\nlet aiResult;\n\ntry {\n  const jsonMatch = rawText.match(/\\{[\\s\\S]*\\}/);\n  if (!jsonMatch) throw new Error(\"No JSON object found\");\n  aiResult = JSON.parse(jsonMatch[0]);\n} catch (e) {\n  aiResult = {\n    classification: \"Suspicious\",\n    phishing_indicators: [\"AI response could not be parsed\"],\n    intent: \"Could not determine intent reliably.\",\n    confidence: 0.5,\n    reasoning: rawText || \"No usable AI response received.\"\n  };\n}\n\nconst prevData = $('Data Normalize').first().json;\nconst vtData = $('VT Data Extract').first().json;\n\nreturn [{\n  json: {\n    ...prevData,\n    vt_malicious: vtData.vt_malicious,\n    vt_suspicious: vtData.vt_suspicious,\n    vt_harmless: vtData.vt_harmless,\n    vt_undetected: vtData.vt_undetected,\n    ...aiResult\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        -160
+      ],
+      "id": "5f054604-70bc-4d05-ba80-65658c12a726",
+      "name": "AI Analysis"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\n\nlet score = 0;\n\nscore += Math.min((d.vt_malicious || 0) * 3, 35);\nscore += Math.min((d.vt_suspicious || 0) * 2, 10);\n\nscore += d.classification === \"High Risk\" ? 30\n       : d.classification === \"Suspicious\" ? 15 : 0;\n\nscore += Math.round((d.confidence || 0) * 15);\n\nconst indicators = Array.isArray(d.phishing_indicators)\n  ? d.phishing_indicators\n  : [];\n\nscore += Math.min(indicators.length * 3, 10);\nscore = Math.min(score, 100);\n\nconst level = score >= 70 ? \"CRITICAL\"\n            : score >= 40 ? \"HIGH\"\n            : score >= 20 ? \"MEDIUM\"\n            : \"LOW\";\n\nreturn [{\n  json: {\n    ...d,\n    risk_score: score,\n    risk_level: level\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        -320
+      ],
+      "id": "df3e60d0-768d-4581-b077-5d869feace23",
+      "name": "Risk Score"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.GROQ_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You generate concise professional cybersecurity incident reports from supplied evidence. Do not invent evidence.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate a professional cybersecurity threat report:\\n\\nINPUT TYPE: {{ $json.input_type }}\\nCONTENT: {{ $json.content }}\\nSOURCE: {{ $json.source }}\\nTIMESTAMP: {{ $json.timestamp }}\\nRISK SCORE: {{ $json.risk_score }}/100\\nRISK LEVEL: {{ $json.risk_level }}\\nCLASSIFICATION: {{ $json.classification }}\\nPHISHING INDICATORS: {{ JSON.stringify($json.phishing_indicators) }}\\nINTENT: {{ $json.intent }}\\nVT MALICIOUS: {{ $json.vt_malicious }}\\nVT SUSPICIOUS: {{ $json.vt_suspicious }}\\nCONFIDENCE: {{ $json.confidence }}\\n\\nFormat the report exactly like this:\\n\\nTHREAT REPORT\\n====================\\nTime: [timestamp]\\nSource: [source]\\nRisk Score: [score]/100 — [level]\\n\\nTHREAT SUMMARY:\\n[2-3 sentence summary]\\n\\nINDICATORS OF COMPROMISE:\\n[bullet list of phishing indicators]\\n\\nEVIDENCE:\\n• VirusTotal: [malicious] malicious, [suspicious] suspicious engines\\n• AI Confidence: [confidence as percentage]%\\n• Intent: [intent]\\n\\nRECOMMENDED ACTIONS:\\n1. [action based on risk level]\\n2. [action]\\n3. [action]\\n\\nKeep it professional and concise.\"\n    }\n  ],\n  \"temperature\": 0.1\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -608,
+        -320
+      ],
+      "id": "28c6735c-4160-443a-9fc4-f003dc04b9e0",
+      "name": "Report Generator"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst reportText = response?.choices?.[0]?.message?.content || \"No report generated.\";\nconst prevData = $('Risk Score').first().json;\n\nreturn [{\n  json: {\n    ...prevData,\n    final_report: reportText\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        -320
+      ],
+      "id": "02618f96-05a1-404e-abd2-b8cd591f2254",
+      "name": "Parse Report"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $json.timestamp }}",
+            "Type": "={{ $json.input_type }}",
+            "Source": "={{ $json.source }}",
+            "Content": "={{ $json.content }}",
+            "Risk Score": "={{ $json.risk_score }}",
+            "Risk Level": "={{ $json.risk_level }}",
+            "Classification": "={{ $json.classification }}",
+            "VT Malicious": "={{ $json.vt_malicious }}",
+            "VT Suspicious": "={{ $json.vt_suspicious }}",
+            "Phishing Indicators": "={{ JSON.stringify($json.phishing_indicators) }}",
+            "Intent": "={{ $json.intent }}",
+            "Confidence": "={{ $json.confidence }}",
+            "Full Report": "={{ $json.final_report }}"
+          },
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -176,
+        -320
+      ],
+      "id": "9692a057-2621-4d4e-bcda-5f97054db4d0",
+      "name": "Cyber Security Log"
+    },
+    {
+      "parameters": {
+        "content": "DATA ENTRY",
+        "height": 320,
+        "width": 880,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1824,
+        -592
+      ],
+      "typeVersion": 1,
+      "id": "4549c54e-6983-429e-8595-7fec833556ec",
+      "name": "Data Entry"
+    },
+    {
+      "parameters": {
+        "content": "THREAT ANALYSIS",
+        "height": 304,
+        "width": 880,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1824,
+        -272
+      ],
+      "typeVersion": 1,
+      "id": "be5bdb93-3c80-43b7-88d0-2eb3112d5e9d",
+      "name": "Threat Analysis"
+    },
+    {
+      "parameters": {
+        "content": "RISK SCORING + REPORTING",
+        "height": 240,
+        "width": 1008,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -944,
+        -384
+      ],
+      "typeVersion": 1,
+      "id": "c12a8a3d-0aa1-4d6d-b576-3cb052961748",
+      "name": "Risk Scoring"
+    },
+    {
+      "parameters": {
+        "content": "ALERTING",
+        "height": 224,
+        "width": 704,
+        "color": "#C1E7EC"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        64,
+        -368
+      ],
+      "typeVersion": 1,
+      "id": "35cd895a-57ac-45f9-ac49-0a3febc2abcb",
+      "name": "Alerting"
+    },
+    {
+      "parameters": {
+        "sendTo": "security@example.com",
+        "subject": "=[{{ $json.classification }}] Threat Detected - Score: {{ $json.risk_score }}/100",
+        "emailType": "text",
+        "message": "={{ $json.final_report }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        128,
+        -320
+      ],
+      "id": "f8efa57d-6888-44f7-89ae-c6c1b06dd57a",
+      "name": "Send Threat Report"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d503c422-b31b-4cd4-b17a-96ecf28303a2",
+              "leftValue": "={{ $json.risk_level }}",
+              "rightValue": "HIGH",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "9b64d430-819a-424c-b494-52eba38ee181",
+              "leftValue": "={{ $json.risk_level }}",
+              "rightValue": "CRITICAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        336,
+        -320
+      ],
+      "id": "2375fd9f-9031-43d2-aec6-11e37cf6a60d",
+      "name": "High Risk Alert"
+    },
+    {
+      "parameters": {
+        "sendTo": "security@example.com",
+        "subject": "=[{{ $json.risk_level }}] Cybersecurity Alert - {{ $json.risk_score }}/100",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:Arial,sans-serif;max-width:680px;margin:0 auto\">\n  <div style=\"background:#DC2626;padding:16px 24px;border-radius:8px 8px 0 0\">\n    <h2 style=\"color:#fff;margin:0\">Cybersecurity Threat Detected</h2>\n  </div>\n  <div style=\"border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px\">\n    <table style=\"width:100%;border-collapse:collapse;margin-bottom:20px\">\n      <tr><td style=\"padding:10px;font-weight:bold\">Risk Score</td><td style=\"padding:10px\"><b>{{ $json.risk_score }}/100 — {{ $json.risk_level }}</b></td></tr>\n      <tr><td style=\"padding:10px;font-weight:bold\">Classification</td><td style=\"padding:10px\">{{ $json.classification }}</td></tr>\n      <tr><td style=\"padding:10px;font-weight:bold\">Input Type</td><td style=\"padding:10px\">{{ $json.input_type }}</td></tr>\n      <tr><td style=\"padding:10px;font-weight:bold\">Content</td><td style=\"padding:10px;word-break:break-word\">{{ $json.content }}</td></tr>\n      <tr><td style=\"padding:10px;font-weight:bold\">Source</td><td style=\"padding:10px\">{{ $json.source }}</td></tr>\n      <tr><td style=\"padding:10px;font-weight:bold\">Timestamp</td><td style=\"padding:10px\">{{ $json.timestamp }}</td></tr>\n      <tr><td style=\"padding:10px;font-weight:bold\">AI Confidence</td><td style=\"padding:10px\">{{ $json.confidence }}</td></tr>\n      <tr><td style=\"padding:10px;font-weight:bold\">VirusTotal</td><td style=\"padding:10px\">{{ $json.vt_malicious }} malicious / {{ $json.vt_suspicious }} suspicious</td></tr>\n    </table>\n    <div style=\"background:#FEF2F2;border-left:4px solid #DC2626;padding:12px 16px;margin-bottom:16px\">\n      <b>Threat Intent:</b><br>{{ $json.intent }}\n    </div>\n    <div style=\"background:#f9fafb;padding:12px 16px;border-radius:4px;margin-bottom:16px\">\n      <b>Phishing Indicators:</b><br>{{ JSON.stringify($json.phishing_indicators) }}\n    </div>\n    <div style=\"background:#f9fafb;padding:12px 16px;border-radius:4px;margin-bottom:16px\">\n      <b>AI Reasoning:</b><br>{{ $json.reasoning }}\n    </div>\n    <div style=\"background:#EFF6FF;border-left:4px solid #2563EB;padding:12px 16px\">\n      <b>Full Threat Report:</b><br><br>{{ $json.final_report }}\n    </div>\n    <hr style=\"margin:20px 0;border:none;border-top:1px solid #e5e7eb\">\n    <p style=\"color:#6b7280;font-size:12px;margin:0\">\n      Automatically generated by AI Cyber Security Co-Pilot.\n    </p>\n  </div>\n</div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        592,
+        -320
+      ],
+      "id": "52d71f14-35f8-4cd9-836a-89864e1cad2f",
+      "name": "Send High Risk Alert"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Data Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Normalize": {
+      "main": [
+        [
+          {
+            "node": "VirusTotal API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VirusTotal API": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Get Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Results": {
+      "main": [
+        [
+          {
+            "node": "VT Data Extract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VT Data Extract": {
+      "main": [
+        [
+          {
+            "node": "Groq API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq API": {
+      "main": [
+        [
+          {
+            "node": "AI Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Analysis": {
+      "main": [
+        [
+          {
+            "node": "Risk Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Risk Score": {
+      "main": [
+        [
+          {
+            "node": "Report Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Generator": {
+      "main": [
+        [
+          {
+            "node": "Parse Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Report": {
+      "main": [
+        [
+          {
+            "node": "Cyber Security Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cyber Security Log": {
+      "main": [
+        [
+          {
+            "node": "Send Threat Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Threat Report": {
+      "main": [
+        [
+          {
+            "node": "High Risk Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Risk Alert": {
+      "main": [
+        [
+          {
+            "node": "Send High Risk Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}

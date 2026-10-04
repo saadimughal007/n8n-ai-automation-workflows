@@ -1,0 +1,627 @@
+{
+  "name": "AI Office System — Multi-Channel Intake & Notification Matrix",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Lead Inquiry Form",
+        "formDescription": "Send us your message and we will get back to you shortly.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Full Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email Address",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Message / Inquiry",
+              "fieldType": "textarea",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Subject"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -624,
+        0
+      ],
+      "id": "cb756772-e216-4db0-9def-8b89485ade05",
+      "name": "On form submission",
+      "webhookId": "lead-intake-form-trigger"
+    },
+    {
+      "parameters": {
+        "content": "                INPUT TRIGGERS",
+        "height": 464,
+        "width": 368
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -736,
+        -256
+      ],
+      "typeVersion": 1,
+      "id": "f97e3320-ccd9-4615-b97b-247559ec16f3",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "        MERGE AND CLEAN DATA",
+        "height": 464,
+        "width": 400,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -368,
+        -256
+      ],
+      "typeVersion": 1,
+      "id": "70a8d578-6fb3-49cc-92bf-01b1f9083430",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -384,
+        -96
+      ],
+      "id": "46e5b27c-174a-42a3-9755-e6c4aee6da0a",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e267d0f4-3ce2-4baf-90c5-f817e76b324c",
+              "name": "Sender",
+              "value": "={{ $json[\"Full Name\"] ?? $('Gmail Trigger').item.json.From ?? \"Unknown\" }}",
+              "type": "string"
+            },
+            {
+              "id": "8fc2fd23-8b62-41ea-a2ad-aa5f871ae034",
+              "name": "sender_email",
+              "value": "={{ $('Gmail Trigger').item.json.From || $json['Email Address'] }}",
+              "type": "string"
+            },
+            {
+              "id": "f42994d9-6a87-4c84-8547-338cf0706bad",
+              "name": "Subject",
+              "value": "={{ $json[\"Subject\"] ?? $('Gmail Trigger').item.json.Subject ?? \"No Subject\" }}",
+              "type": "string"
+            },
+            {
+              "id": "b6a2b8ce-3be2-4723-8777-1fc95c49edc8",
+              "name": "Body",
+              "value": "={{ $json[\"Message / Inquiry\"] ?? $('Gmail Trigger').item.json.snippet ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "93724a9c-a74e-473e-90c3-0b36fd8f9d47",
+              "name": "Source",
+              "value": "={{ $json[\"Full Name\"] ? \"form\" : \"email\" }}",
+              "type": "string"
+            },
+            {
+              "id": "c97abb98-4d01-4c8e-b9c1-4e0af9ab56f7",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -176,
+        -96
+      ],
+      "id": "12bf259e-7332-4167-a405-f53e23ba19f9",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "=You are a professional AI office assistant for a business.\n\nYour job is to:\n1. Read the incoming message carefully\n2. Detect the intent (e.g. sales inquiry, support request, general question, partnership, complaint)\n3. Write a professional, warm, and concise email reply (max 120 words)\n4. Suggest an internal action label: RESPOND, FOLLOW_UP, ESCALATE, or IGNORE\n\nAlways reply in this exact JSON format:\n{\n  \"intent\": \"...\",\n  \"reply\": \"...\",\n  \"action\": \"RESPOND | FOLLOW_UP | ESCALATE | IGNORE\",\n  \"priority\": \"HIGH | MEDIUM | LOW\"\n}"
+            },
+            {
+              "content": "=From: ({{ $json.sender_email }})\nSubject: {{ $json.Subject }}\nMessage: {{$json.Body }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        32,
+        -96
+      ],
+      "id": "2971a812-d2ee-4f3a-a383-ae71b3c9453f",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "openai_api_credential_id",
+          "name": "OpenAI Production Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "            AI AGENT (OpenAI)",
+        "height": 464,
+        "width": 512,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        16,
+        -256
+      ],
+      "typeVersion": 1,
+      "id": "a4c224bb-ad08-4dcf-b18b-2a32e32e5650",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Edit Fields').item.json.sender_email || $('On form submission').item.json['Email Address'] }}",
+        "subject": "={{ $('Edit Fields').item.json.Subject }}",
+        "emailType": "text",
+        "message": "={{ $json.reply }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        848,
+        48
+      ],
+      "id": "484bcb9d-29b4-450f-bf50-2d242069404b",
+      "name": "Send a message",
+      "webhookId": "gmail-autoresponder",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail_oauth_credential_id",
+          "name": "Gmail Production Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "          ACTION",
+        "height": 448,
+        "width": 288,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        528,
+        -256
+      ],
+      "typeVersion": 1,
+      "id": "9eda3633-7c84-450a-a978-fb1961ca1614",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "YOUR_SLACK_CHANNEL_ID",
+          "mode": "list",
+          "cachedResultName": "alert_system"
+        },
+        "text": "=*New Lead Alert* {{ $('On form submission').item.json['Full Name'] || 'Inquiry' }} *From:* {{ $('Edit Fields').item.json.sender_email }} *Subject:* {{$('Edit Fields').item.json.Subject }} *Intent:* {{ $('CONTENT').item.json.intent }} *Priority:* {{$('CONTENT').item.json.priority }} *Action:* {{ $('CONTENT').item.json.action }} *Time:* {{$('Edit Fields').item.json.timestamp }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1040,
+        48
+      ],
+      "id": "eeff18f1-3e24-4e7c-b92d-65356b759ac5",
+      "name": "Send a message1",
+      "webhookId": "slack-alert-notification",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "slack_oauth_credential_id",
+          "name": "Slack Production Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "try {\n  const item = $input.first().json;\n  const raw = item.output?.[0]?.content?.[0]?.text || item.message?.content || item.text || \"\";\n  const cleaned = raw.replace(/```(?:json)?/g, '').trim();\n  const ai = JSON.parse(cleaned);\n  return [{\n    json: {\n      ...item,\n      intent: ai.intent || \"unknown\",\n      reply: ai.reply || \"\",\n      action: ai.action || \"RESPOND\",\n      priority: ai.priority || \"MEDIUM\"\n    }\n  }];\n} catch (error) {\n  return [{\n    json: {\n      error: true,\n      message: error.message,\n      raw: JSON.stringify($input.first().json, null, 2)\n    }\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        -96
+      ],
+      "id": "d45a70c5-09b7-4de6-9896-9e53704917a5",
+      "name": "CONTENT"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -640,
+        -176
+      ],
+      "id": "00d55870-8ec2-4e15-8ed1-fbe118610194",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail_oauth_credential_id",
+          "name": "Gmail Production Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "      PRIORITY",
+        "height": 464,
+        "width": 640,
+        "color": "#8E8025"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        816,
+        -272
+      ],
+      "typeVersion": 1,
+      "id": "6dd10da8-2f66-437b-baca-fd5ed19ce322",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "471c01c9-a4e1-4a6e-9932-87b91babd92b",
+              "leftValue": "={{$json.action}}",
+              "rightValue": "FOLLOW_UP",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        528,
+        -96
+      ],
+      "id": "9bd57dfe-7c91-4f5e-ad31-e0456df2e587",
+      "name": "Esclate Filter"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_DOCUMENT_ID",
+          "mode": "list",
+          "cachedResultName": "Log every Interaction",
+          "cachedResultUrl": "[https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit](https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit)"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "[https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit#gid=0](https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit#gid=0)"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $('Edit Fields').item.json.timestamp }}",
+            "Name": "={{ $('Edit Fields').item.json.Sender }}",
+            "Email": "={{ $('Edit Fields').item.json.sender_email }}",
+            "Subject": "={{ $('Edit Fields').item.json.Subject }}",
+            "Intent": "={{ $('CONTENT').item.json.intent }}",
+            "Priority": "={{ $('CONTENT').item.json.priority }}",
+            "Action": "={{ $('CONTENT').item.json.action }}",
+            "Reply Sent": "={{ $('Send a message1').item.json.message.text }}",
+            "Source": "={{ $('Edit Fields').item.json.Source }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Subject",
+              "displayName": "Subject",
+              "required": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "required": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Priority",
+              "displayName": "Priority",
+              "required": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Action",
+              "displayName": "Action",
+              "required": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Reply Sent",
+              "displayName": "Reply Sent",
+              "required": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1280,
+        48
+      ],
+      "id": "1a5202ba-8fa6-4bcb-b273-b77b7bc3e091",
+      "name": "Append row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google_sheets_credentials_id",
+          "name": "Google Sheets Production Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        832,
+        -160
+      ],
+      "id": "4a25f1b0-3a17-4a33-b9f3-256ae134e3b6",
+      "name": "Wait",
+      "webhookId": "followup-wait-node"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Edit Fields').item.json.sender_email }}",
+        "subject": "=Following up: {{ $('Edit Fields').item.json.Subject }}",
+        "emailType": "text",
+        "message": "=Hi {{ $('Edit Fields').item.json.Sender }},\n\nJust following up on your inquiry regarding \"{{ $('Edit Fields').item.json.Subject }}\". We would love to help — are you available for a quick call this week?\n\nBest regards,\nThe Team",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        -160
+      ],
+      "id": "11618d93-c8c1-47ff-b6b9-4c91e009b861",
+      "name": "Send a message2",
+      "webhookId": "gmail-followup-sender",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail_oauth_credential_id",
+          "name": "Gmail Production Account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "CONTENT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CONTENT": {
+      "main": [
+        [
+          {
+            "node": "Esclate Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esclate Filter": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}

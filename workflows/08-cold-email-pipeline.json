@@ -1,0 +1,638 @@
+{
+  "name": "B2B Cold Outreach & Lead Personalization Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "Run actor and get dataset",
+        "actorId": {
+          "__rl": true,
+          "value": "WnMxbsRLNbPeYL6ge",
+          "mode": "list",
+          "cachedResultName": "Google Maps Email Extractor",
+          "cachedResultUrl": "https://console.apify.com/actors/WnMxbsRLNbPeYL6ge/input"
+        },
+        "customBody": "={\n  \"language\": \"en\",\n  \"locationQuery\":\"{{ $json.body.locationQuery }}\",\n  \"maxCrawledPlacesPerSearch\":{{ $json.body.maxCrawledPlacesPerSearch }} ,\n  \"scrapeContacts\": true,\n  \"scrapePlaceDetailPage\": true,\n  \"scrapeSocialMediaProfiles\": {\n    \"email\": true,\n    \"facebooks\": true,\n    \"instagrams\": true,\n    \"tiktoks\": false\n  },\n  \"searchStringsArray\": [\n  \"{{ $json.body.searchStringsArray }}\"\n  ]\n} ",
+        "authentication": "apifyOAuth2Api"
+      },
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        432
+      ],
+      "id": "a1a11e56-4001-49e4-a647-e1d195eeafd6",
+      "name": "Run an Actor and get dataset",
+      "credentials": {
+        "apifyOAuth2Api": {
+          "id": "apify_oauth_credential_id",
+          "name": "Apify Production Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9a431350-8fc4-4d97-a85f-13388ab1eb0c",
+              "name": "title",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "27ebd1a9-1057-4a1e-bccc-51b35719e976",
+              "name": "categoryName",
+              "value": "={{ $json.categoryName }}",
+              "type": "string"
+            },
+            {
+              "id": "ceae8374-e413-4b86-ae3d-73a454d2e62a",
+              "name": "phone",
+              "value": "={{ $json.phone }}",
+              "type": "string"
+            },
+            {
+              "id": "d241215a-d7cf-4d34-a24c-0998500d9c9a",
+              "name": "emails",
+              "value": "={{ $json.emails }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -272,
+        416
+      ],
+      "id": "45b472b9-4c6d-41ed-ad19-13eed05a4b1e",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -528,
+        432
+      ],
+      "id": "8ab1a5ec-1687-4e54-89a0-5c7e7ef214b9",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        528,
+        416
+      ],
+      "id": "0ea5dfdb-ff84-46a4-8b48-22508b297682",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.Email }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    },
+                    "id": "38f3ceb8-01cc-4c7d-9eec-17f50ac7db2a"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Emails"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "34ee00a1-e3a8-441d-9e98-7909d183a633",
+                    "leftValue": "={{ $json.Email }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "empty",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Contact Number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        800,
+        496
+      ],
+      "id": "e4ccfd70-de42-4c7e-ba3f-82b5654637af",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.Name }}{{ $json.Services }}",
+        "options": {
+          "systemMessage": "You are an assistant that writes short, personalized cold outreach emails to businesses.\n\nGOAL:\nWrite a natural, human-sounding email that introduces a helpful solution without sounding salesy or spammy.\n\nSTRICT RULES:\n1. PERSONALIZATION: Always include the business name and specific service.\n2. SAFE LANGUAGE: Use realistic, helpful phrasing without hype or unrealistic claims.\n3. LENGTH: Keep it short (3-5 lines max).\n4. OUTPUT FORMAT: Plain text body only without subject lines or placeholders."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1632,
+        -48
+      ],
+      "id": "24894595-9e55-4452-bb19-b088ad334f2d",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1856,
+        64
+      ],
+      "id": "7b93c7c2-84c9-40fc-b65f-fdf655476800",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "openai_api_credential_id",
+          "name": "OpenAI Production Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.Email || 'lead@example.com' }}",
+        "subject": "Quick inquiry regarding {{ $json.Name || 'your business' }}",
+        "emailType": "text",
+        "message": "={{ $json.output }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1936,
+        -48
+      ],
+      "id": "3de4cc36-aff2-41e4-8bcf-d689a8b4868d",
+      "name": "Send a message",
+      "webhookId": "gmail-outbound-sender",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail_oauth_credential_id",
+          "name": "Gmail Production Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "b2b_outreach_trigger",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1136,
+        432
+      ],
+      "id": "16249e55-dcff-482b-b7c0-3c349a789140",
+      "name": "Webhook",
+      "webhookId": "outreach-webhook-trigger"
+    },
+    {
+      "parameters": {
+        "operation": "rowNotExists",
+        "dataTableId": {
+          "__rl": true,
+          "value": "data_table_leads_id",
+          "mode": "list",
+          "cachedResultName": "EmailScraper",
+          "cachedResultUrl": "/datatables/leads"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "Email",
+              "keyValue": "={{ $json.emails }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -80,
+        416
+      ],
+      "id": "798cb734-9270-4ade-ac03-a63759ee7fd9",
+      "name": "If row does not exist"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "data_table_leads_id",
+          "mode": "list",
+          "cachedResultName": "EmailScraper",
+          "cachedResultUrl": "/datatables/leads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $json.title }}",
+            "Email": "={{ $json.emails[0] }}",
+            "Category": "={{ $json.categoryName }}",
+            "Services": "={{ $json.categoryName }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Category",
+              "displayName": "Category",
+              "required": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "Services",
+              "displayName": "Services",
+              "required": false,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        336,
+        416
+      ],
+      "id": "936dab0b-7162-4163-b7fd-201f20e791b7",
+      "name": "Insert row"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1736de1e-efc3-46a5-a94d-6c54a44773c1",
+              "name": "body.searchStringsArray",
+              "value": "={{ $json.body.searchStringsArray }}",
+              "type": "string"
+            },
+            {
+              "id": "fbcb84be-d4c0-4162-9aee-de12e2187d6f",
+              "name": "body.locationQuery",
+              "value": "={{ $json.body.locationQuery }}",
+              "type": "string"
+            },
+            {
+              "id": "450fb18b-8332-4654-9621-247e7bb5548a",
+              "name": "body.maxCrawledPlacesPerSearch",
+              "value": "={{ $json.body.maxCrawledPlacesPerSearch }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -928,
+        432
+      ],
+      "id": "d654f7f0-a5f7-414d-a889-84cbc8513131",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        128,
+        416
+      ],
+      "id": "f71b9f4c-40f8-4004-bfb0-2a1c645daf82",
+      "name": "Loop Over Items2"
+    },
+    {
+      "parameters": {
+        "amount": "={{ Math.floor(Math.random()*(300-120+1)+120)}}"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1280,
+        480
+      ],
+      "id": "dfcc0583-36da-40a6-8171-084eea3e91c6",
+      "name": "Wait",
+      "webhookId": "rate-limit-wait-node"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1040,
+        480
+      ],
+      "id": "006c792f-849f-4767-8875-800974be70a3",
+      "name": "Loop Over Items3"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1520,
+        464
+      ],
+      "id": "4424f3d1-6d07-45db-926b-17e0e10f354f",
+      "name": "Loop Over Items4"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Run an Actor and get dataset": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "If row does not exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If row does not exist": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert row": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Run an Actor and get dataset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items2": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items3": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items4": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}

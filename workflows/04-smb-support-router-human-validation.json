@@ -1,0 +1,829 @@
+{
+  "name": "SMB AI Support Router with Smart Escalation & Human Validation",
+  "nodes": [
+    {
+      "parameters": {
+        "inputText": "={{ $json.chatInput }}",
+        "options": {
+          "categories": "Positive, Neutral, Negative, Urgent",
+          "systemPromptTemplate": "You are highly intelligent and accurate sentiment analyzer. Analyze the sentiment of the provided text. Categorize it into one of the following: {categories}. Use the provided formatting instructions. Only output the JSON.",
+          "includeDetailedResults": true,
+          "enableAutoFixing": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.sentimentAnalysis",
+      "typeVersion": 1.1,
+      "position": [
+        -1328,
+        0
+      ],
+      "id": "3fb7458d-bc52-4aab-82c7-5b3cfeb44bbf",
+      "name": "Sentiment Analysis"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -1008,
+        240
+      ],
+      "id": "c902d7ec-19f2-42a5-a482-91d0c1e6952a",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "openai_api_credential_id",
+          "name": "OpenAI Production Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputText": "={{ $json.chatInput }}",
+        "categories": {
+          "categories": [
+            {
+              "category": "Sales",
+              "description": "Questions about pricing, purchases, discounts, offers, or buying products"
+            },
+            {
+              "category": "Technical",
+              "description": "Bug reports, technical issues, product help, how-to questions, or feature requests"
+            },
+            {
+              "category": "Billing",
+              "description": "Invoices, payments, refunds, charges, subscription billing, or payment methods"
+            },
+            {
+              "category": "General",
+              "description": "General inquiries, feedback, or anything that doesn't fit the other categories"
+            }
+          ]
+        },
+        "options": {
+          "systemPromptTemplate": "Choose exactly one department only.\n\nIf multiple departments seem relevant, apply this priority:\n1. Technical — bugs, errors, login problems, API issues, integrations, system failures\n2. Billing — invoices, payments, refunds, subscriptions, charges\n3. Sales — pricing, demos, plans, upgrades, product interest\n4. General — anything else\n\nFor mixed Sales + Technical tickets, choose Technical if the message mentions an error, bug, API problem, integration issue, login issue, or system not working."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.textClassifier",
+      "typeVersion": 1.1,
+      "position": [
+        -1008,
+        0
+      ],
+      "id": "18469312-6f28-4989-b4d8-55abf3a8af1c",
+      "name": "Classify Department"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7749db0a-0bcf-46e1-8fcf-f8ac9801f089",
+              "name": "department_category",
+              "value": "Technical",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -640,
+        -64
+      ],
+      "id": "00e4e1f9-2b23-4cbc-aac6-ac428fdfc2dc",
+      "name": "Technical Department"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7749db0a-0bcf-46e1-8fcf-f8ac9801f089",
+              "name": "department_category",
+              "value": "Billing",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -640,
+        96
+      ],
+      "id": "22b92388-e757-4877-b962-5e74acc18bd1",
+      "name": "Billing Department"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7749db0a-0bcf-46e1-8fcf-f8ac9801f089",
+              "name": "department_category",
+              "value": "General",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -640,
+        256
+      ],
+      "id": "19e7522c-c6b5-425a-beb7-08dc03fa30eb",
+      "name": "General Department"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseMode": "responseNodes"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -1552,
+        32
+      ],
+      "id": "b5274cd2-ead8-496c-a863-e16787da83fe",
+      "name": "Support Ticket Trigger",
+      "webhookId": "support-ticket-chat-trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7749db0a-0bcf-46e1-8fcf-f8ac9801f089",
+              "name": "department_category",
+              "value": "Sales",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -640,
+        -224
+      ],
+      "id": "e4fa1225-adc5-4f63-a8b4-833dededdd3f",
+      "name": "Sales Department"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8e5e76d0-c0fe-4c6d-b693-375916f271c9",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        240,
+        240
+      ],
+      "id": "b54f5a7e-0dea-4976-8212-ec0ac0638c6d",
+      "name": "Is Sentiment Confirmed?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6d23302c-97b3-4364-b59b-53cbc3f90b83",
+              "name": "sentimentAnalysis.category",
+              "value": "={{ $('Merge').item.json.sentimentAnalysis.category }}",
+              "type": "string"
+            },
+            {
+              "id": "742f399b-c1ad-4a77-86fd-5b7bdf06724a",
+              "name": "review_decision",
+              "value": "APPROVED",
+              "type": "string"
+            },
+            {
+              "id": "77eb23e4-bf89-4e03-9537-3c2ac5539e93",
+              "name": "review_type",
+              "value": "={{ $('Calculate Priority & Review Requirement').item.json.requires_human_review ? 'HUMAN_APPROVED' : 'AUTO_APPROVED' }}",
+              "type": "string"
+            },
+            {
+              "id": "1bbd6b22-5488-4405-b055-f82c96037d6e",
+              "name": "workflow_status",
+              "value": "=APPROVED",
+              "type": "string"
+            },
+            {
+              "id": "a0395ed1-05be-4b1f-b9a1-35421701c8a6",
+              "name": "ticket_text",
+              "value": "={{ $('Calculate Priority & Review Requirement').item.json.ticket_text || $('Merge').item.json.ticket_text }}",
+              "type": "string"
+            },
+            {
+              "id": "911ab403-e5f0-4999-91f3-6ac52e9556b7",
+              "name": "original_chat_input",
+              "value": "={{ $('Merge').item.json.original_chat_input || $('Merge').item.json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "53e18646-4c1b-4b82-b8a0-94932965cde2",
+              "name": "final_sentiment",
+              "value": "={{ $('Merge').item.json.final_sentiment || $('Merge').item.json.sentimentAnalysis.category }}",
+              "type": "string"
+            },
+            {
+              "id": "66afbde4-ac74-4b57-9b70-e688258b5139",
+              "name": "department_category",
+              "value": "={{ $('Merge').item.json.department_category }}",
+              "type": "string"
+            },
+            {
+              "id": "4aa3558e-d19c-4d91-86bc-34c3b2d8a0a3",
+              "name": "final_department",
+              "value": "={{ $('Merge').item.json.final_department || $('Merge').item.json.department_category }}",
+              "type": "string"
+            },
+            {
+              "id": "74452302-6b80-4b51-b6b3-04947da8db62",
+              "name": "priority",
+              "value": "={{ $('Calculate Priority & Review Requirement').item.json.priority }}",
+              "type": "string"
+            },
+            {
+              "id": "da8740dc-21a5-4aad-8561-337dac096f63",
+              "name": "priority_score",
+              "value": "={{ $('Calculate Priority & Review Requirement').item.json.priority_score }}",
+              "type": "string"
+            },
+            {
+              "id": "d6694fee-7e34-4ea1-97c7-14927158a38a",
+              "name": "requires_human_review",
+              "value": "={{ $('Calculate Priority & Review Requirement').item.json.requires_human_review }}",
+              "type": "string"
+            },
+            {
+              "id": "4c75ab9c-f52d-4379-a4b4-599bd1c210da",
+              "name": "matched_risk_keywords",
+              "value": "={{ $('Calculate Priority & Review Requirement').item.json.matched_risk_keywords?.join(', ') || 'none' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        32
+      ],
+      "id": "4d7ad2e4-f3f0-4017-9e02-cfaa2134e8b8",
+      "name": "Approve Sentiment"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1c584654-f2a8-4b04-b58b-3871ca90a9a0",
+              "name": "sentimentAnalysis.category",
+              "value": "={{ $json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "4a72b452-237e-45ae-b4ba-3cbf278bb5d0",
+              "name": "final_sentiment",
+              "value": "={{ $('Chat_Change Sentiment').item.json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "c16277c1-ef8e-4251-91ff-0a8f8a5eef34",
+              "name": "review_decision",
+              "value": "CORRECTED",
+              "type": "string"
+            },
+            {
+              "id": "2bde1838-9bf4-4b30-9c06-a757965d0a2a",
+              "name": "review_type",
+              "value": "HUMAN_CORRECTED",
+              "type": "string"
+            },
+            {
+              "id": "7783ed31-8906-41a6-87b3-27db938f43d8",
+              "name": "workflow_status",
+              "value": "APPROVED",
+              "type": "string"
+            },
+            {
+              "id": "33a941d5-c74b-4e4f-8c85-1a6306f94d52",
+              "name": "ticket_text",
+              "value": "={{ $('Calculate Priority & Review Requirement').item.json.ticket_text }}",
+              "type": "string"
+            },
+            {
+              "id": "6d2d4b0a-dc68-4aee-8784-f8927c60612c",
+              "name": "original_chat_input",
+              "value": "={{ $('Calculate Priority & Review Requirement').item.json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "dce90c59-1399-4e7f-b4da-1af87661cb78",
+              "name": "department_category",
+              "value": "={{ $('Chat_Change Department').item.json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "769af48a-bb71-4724-b534-672108e2d7b6",
+              "name": "final_department",
+              "value": "={{ $('Chat_Change Department').item.json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "593b795d-f9e9-4723-b675-bbef70141cf7",
+              "name": "priority_score",
+              "value": "={{ $('Calculate Priority & Review Requirement').item.json.priority_score }}",
+              "type": "string"
+            },
+            {
+              "id": "bcaca565-9121-4725-932a-b4fc49d8a108",
+              "name": "priority",
+              "value": "={{ $('Calculate Priority & Review Requirement').item.json.priority }}",
+              "type": "string"
+            },
+            {
+              "id": "41299ff0-a9e4-4e51-a95f-f1c75dd269a9",
+              "name": "requires_human_review",
+              "value": "={{ $('Calculate Priority & Review Requirement').item.json.requires_human_review }}",
+              "type": "string"
+            },
+            {
+              "id": "c7ed147e-a93b-4f12-80f7-6d61fdbf9c72",
+              "name": "sessionId",
+              "value": "={{ $('Chat_Change Sentiment').item.json.sessionId }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        272
+      ],
+      "id": "c55b140e-d920-4cd4-ab66-16f4e5a40293",
+      "name": "Change Sentiment"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Support ticket:\n{{ $json.ticket_text || $json.original_chat_input }}\n\nFinal sentiment:\n{{ $json.final_sentiment || $json.sentimentAnalysis.category }}\n\nFinal department:\n{{ $json.final_department || $json.department_category }}\n\nPriority:\n{{ $json.priority }}\n\nPriority score:\n{{ $json.priority_score }}\n\nReview type:\n{{ $json.review_type }}\n\nWorkflow status:\n{{ $json.workflow_status }}",
+        "options": {
+          "systemMessage": "You are a professional customer support agent.\n\nYour task is to generate a concise, helpful, and professional customer response based on the approved ticket data.\n\nUse the final reviewed values as the source of truth:\n- Final sentiment\n- Final department\n- Priority\n- Review type\n\nRules:\n- Keep the response short, clear, and actionable.\n- End with a next step.\n- Do not include internal system details or score values."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1024,
+        32
+      ],
+      "id": "78dfa122-9787-4d3a-b6ee-49958cfcb06b",
+      "name": "Generate Response"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -1328,
+        240
+      ],
+      "id": "9898be9d-6de7-4f35-9813-d72e30f55598",
+      "name": "OpenAI Chat Sentiment Analysis",
+      "credentials": {
+        "openAiApi": {
+          "id": "openai_api_credential_id",
+          "name": "OpenAI Production Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        992,
+        272
+      ],
+      "id": "3687b8a6-a197-44e1-9b7e-b1e603a61a69",
+      "name": "OpenAI Chat Generate Response",
+      "credentials": {
+        "openAiApi": {
+          "id": "openai_api_credential_id",
+          "name": "OpenAI Production Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "task": "=TASK_ID_PLACEHOLDER",
+        "title": "=[{{ $('Merge Approved Tickets').first().json.priority }}] {{ $('Merge Approved Tickets').first().json.final_department }} Ticket",
+        "additionalFields": {
+          "notes": "=Ticket:\n{{ $('Merge Approved Tickets').first().json.ticket_text }}\n\nPriority:\n{{ $('Merge Approved Tickets').first().json.priority }}\n\nFinal Sentiment:\n{{ $('Merge Approved Tickets').first().json.final_sentiment }}\n\nReview Type:\n{{ $('Merge Approved Tickets').first().json.review_type }}\n\nAI Response:\n{{ $('Generate Response').first().json.output }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleTasks",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        32
+      ],
+      "id": "d7b90773-be07-44d4-a37e-5e9b5d52237f",
+      "name": "Create Support Task",
+      "credentials": {
+        "googleTasksOAuth2Api": {
+          "id": "google_tasks_credentials_id",
+          "name": "Google Tasks Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_DOCUMENT_ID",
+          "mode": "list",
+          "cachedResultName": "Support Tickets",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "created_at": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}",
+            "ticket_text": "={{ $('Merge Approved Tickets').item.json.ticket_text }}",
+            "final_sentiment": "={{ $('Merge Approved Tickets').item.json.final_sentiment }}",
+            "final_department": "={{ $('Merge Approved Tickets').item.json.final_department }}",
+            "priority": "={{ $('Merge Approved Tickets').item.json.priority }}",
+            "priority_score": "={{ $('Merge Approved Tickets').item.json.priority_score }}",
+            "requires_human_review": "={{ $('Merge Approved Tickets').item.json.requires_human_review }}",
+            "review_type": "={{ $('Merge Approved Tickets').item.json.review_type }}",
+            "review_decision": "={{ $('Merge Approved Tickets').item.json.review_decision }}",
+            "workflow_status": "={{ $('Merge Approved Tickets').item.json.workflow_status }}",
+            "ai_response": "={{ $json.output }}",
+            "matched_risk_keywords": "={{ $('Merge Approved Tickets').item.json.matched_risk_keywords?.join(', ') || 'none' }}",
+            "department_review_status": "={{ $('Calculate Priority & Review Requirement').item.json.final_department !== $('Merge Approved Tickets').item.json.final_department ? 'CHANGED' : 'UNCHANGED' }}",
+            "original_department": "={{ $('Calculate Priority & Review Requirement').item.json.final_department || $('Calculate Priority & Review Requirement').item.json.department_category }}",
+            "session_id": "={{ $('Merge Approved Tickets').item.json.sessionId }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "ticket_text",
+              "displayName": "ticket_text",
+              "required": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "final_sentiment",
+              "displayName": "final_sentiment",
+              "required": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "final_department",
+              "displayName": "final_department",
+              "required": false,
+              "display": true,
+              "type": "string"
+            },
+            {
+              "id": "priority",
+              "displayName": "priority",
+              "required": false,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1328,
+        32
+      ],
+      "id": "a10b8513-0236-407d-bd8b-252ac6bf0495",
+      "name": "Support Tickets Table",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google_sheets_credentials_id",
+          "name": "Google Sheets Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -400,
+        -16
+      ],
+      "id": "920b61e8-a36a-40bf-b5e2-c1376cf508b9",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const data = item.json;\n  const sentiment = data.sentimentAnalysis?.category || data.category || 'Neutral';\n  const department = data.department_category || 'General';\n  const ticketText = data.chatInput || '';\n\n  let priorityScore = 0;\n  const text = ticketText.toLowerCase();\n\n  if (sentiment === 'Urgent') priorityScore += 45;\n  else if (sentiment === 'Negative') priorityScore += 30;\n  else if (sentiment === 'Neutral') priorityScore += 10;\n  else if (sentiment === 'Positive') priorityScore += 5;\n\n  if (department === 'Billing') priorityScore += 20;\n  if (department === 'Technical') priorityScore += 15;\n  if (department === 'Sales') priorityScore += 10;\n  if (department === 'General') priorityScore += 5;\n\n  const riskKeywords = ['refund', 'charged twice', 'double charge', 'cancel', 'angry', 'furious', 'immediately', 'not working', 'cannot login', 'urgent', 'complaint'];\n  const matchedKeywords = riskKeywords.filter(keyword => text.includes(keyword));\n  priorityScore += matchedKeywords.length * 10;\n  if (priorityScore > 100) priorityScore = 100;\n\n  let priority = 'LOW';\n  if (priorityScore >= 80) priority = 'CRITICAL';\n  else if (priorityScore >= 60) priority = 'HIGH';\n  else if (priorityScore >= 31) priority = 'MEDIUM';\n\n  const requiresHumanReview = priority === 'HIGH' || priority === 'CRITICAL' || sentiment === 'Urgent' || sentiment === 'Negative';\n\n  return {\n    json: {\n      ...data,\n      final_sentiment: sentiment,\n      final_department: department,\n      ticket_text: ticketText,\n      priority_score: priorityScore,\n      priority,\n      matched_risk_keywords: matchedKeywords,\n      requires_human_review: requiresHumanReview,\n      workflow_status: requiresHumanReview ? 'WAITING_HUMAN_REVIEW' : 'AI_AUTO_APPROVED'\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        16
+      ],
+      "id": "e35ff8bb-e1ab-4522-ba88-6bf5a17ddde9",
+      "name": "Calculate Priority & Review Requirement"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2ac8b6a1-a05a-4b28-8bfa-3bd52146ae74",
+              "leftValue": "={{ $json.requires_human_review }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -48,
+        16
+      ],
+      "id": "b0954fe5-2bc6-4bc7-83a7-bdef1fd1cee2",
+      "name": "Requires Human Review?"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        848,
+        32
+      ],
+      "id": "b9a1bc02-010e-4108-abe8-41f88d9c33b3",
+      "name": "Merge Approved Tickets"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "message": "What is your sentiment estimate category?\n\nChoose from Positive/Neutral/Negative/Urgent",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1.3,
+      "position": [
+        256,
+        496
+      ],
+      "id": "f064ed0d-21a0-4a24-9eb5-2ed6c4944d07",
+      "name": "Chat_Change Sentiment",
+      "webhookId": "chat-sentiment-change"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "message": "=Message: {{ $('Support Ticket Trigger').item.json.chatInput }}\n\nSentiment: {{ $('Sentiment Analysis').item.json.sentimentAnalysis.category }}\n\nDepartment:\n{{ $('Calculate Priority & Review Requirement').item.json.final_department || $('Calculate Priority & Review Requirement').item.json.department_category }}\n\nPriority:\n{{ $('Calculate Priority & Review Requirement').item.json.priority }}\n\nApprove if correct.\nIf either sentiment OR department is incorrect, press Decline to provide corrections.",
+        "responseType": "approval",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double"
+          }
+        },
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 45,
+              "resumeUnit": "minutes"
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        0
+      ],
+      "id": "5ff1f04f-fa66-440e-aa4e-e17587b7c686",
+      "name": "Chat_Approve or Decline Sentiment",
+      "webhookId": "chat-approval-review"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "message": "Please provide the correct department. Choose one of: Sales, Technical, Billing, General.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1.3,
+      "position": [
+        480,
+        496
+      ],
+      "id": "bfdf660b-6277-478e-a6bf-0b3b5eb0c55a",
+      "name": "Chat_Change Department",
+      "webhookId": "chat-department-change"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Sentiment Analysis": {
+      "main": [
+        [{"node": "Classify Department", "type": "main", "index": 0}],
+        [{"node": "Classify Department", "type": "main", "index": 0}],
+        [{"node": "Classify Department", "type": "main", "index": 0}],
+        [{"node": "Classify Department", "type": "main", "index": 0}]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [[{"node": "Classify Department", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Classify Department": {
+      "main": [
+        [{"node": "Sales Department", "type": "main", "index": 0}],
+        [{"node": "Technical Department", "type": "main", "index": 0}],
+        [{"node": "Billing Department", "type": "main", "index": 0}],
+        [{"node": "General Department", "type": "main", "index": 0}]
+      ]
+    },
+    "Technical Department": {
+      "main": [[{"node": "Merge", "type": "main", "index": 1}]]
+    },
+    "Billing Department": {
+      "main": [[{"node": "Merge", "type": "main", "index": 2}]]
+    },
+    "General Department": {
+      "main": [[{"node": "Merge", "type": "main", "index": 3}]]
+    },
+    "Support Ticket Trigger": {
+      "main": [[{"node": "Sentiment Analysis", "type": "main", "index": 0}]]
+    },
+    "Sales Department": {
+      "main": [[{"node": "Merge", "type": "main", "index": 0}]]
+    },
+    "Is Sentiment Confirmed?": {
+      "main": [
+        [{"node": "Approve Sentiment", "type": "main", "index": 0}],
+        [{"node": "Chat_Change Sentiment", "type": "main", "index": 0}]
+      ]
+    },
+    "Change Sentiment": {
+      "main": [[{"node": "Merge Approved Tickets", "type": "main", "index": 0}]]
+    },
+    "Approve Sentiment": {
+      "main": [[{"node": "Merge Approved Tickets", "type": "main", "index": 0}]]
+    },
+    "OpenAI Chat Sentiment Analysis": {
+      "ai_languageModel": [[{"node": "Sentiment Analysis", "type": "ai_languageModel", "index": 0}]]
+    },
+    "OpenAI Chat Generate Response": {
+      "ai_languageModel": [[{"node": "Generate Response", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Generate Response": {
+      "main": [[{"node": "Support Tickets Table", "type": "main", "index": 0}]]
+    },
+    "Support Tickets Table": {
+      "main": [[{"node": "Create Support Task", "type": "main", "index": 0}]]
+    },
+    "Merge": {
+      "main": [[{"node": "Calculate Priority & Review Requirement", "type": "main", "index": 0}]]
+    },
+    "Calculate Priority & Review Requirement": {
+      "main": [[{"node": "Requires Human Review?", "type": "main", "index": 0}]]
+    },
+    "Requires Human Review?": {
+      "main": [
+        [{"node": "Chat_Approve or Decline Sentiment", "type": "main", "index": 0}],
+        [{"node": "Approve Sentiment", "type": "main", "index": 0}]
+      ]
+    },
+    "Merge Approved Tickets": {
+      "main": [[{"node": "Generate Response", "type": "main", "index": 0}]]
+    },
+    "Chat_Change Sentiment": {
+      "main": [[{"node": "Chat_Change Department", "type": "main", "index": 0}]]
+    },
+    "Chat_Approve or Decline Sentiment": {
+      "main": [[{"node": "Is Sentiment Confirmed?", "type": "main", "index": 0}]]
+    },
+    "Chat_Change Department": {
+      "main": [[{"node": "Change Sentiment", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}

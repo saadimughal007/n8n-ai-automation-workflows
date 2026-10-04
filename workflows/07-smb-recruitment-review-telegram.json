@@ -1,0 +1,188 @@
+{
+  "name": "SMB AI Recruitment Review Notification Sub-workflow PORTFOLIO",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -288,
+        0
+      ],
+      "id": "b3b7d893-66c0-4394-9561-8f18ffb3621c",
+      "name": "Receive Review Candidate"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🟡 Candidate Requires Manual Review\n\n👤 Name: {{ $json.name }}\n📧 Email: {{ $json.email }}\n📞 Phone: {{ $json.phone }}\n\n💼 Position: {{ $json.position }}\n⭐ Score: {{ $json.score }}\n📌 Status: {{ $json.status }}\n\n📎 CV Link:\n{{ encodeURI($json.cv_link) }}\n\n🆔 Application ID:\n{{ $json.application_id }}\n\n⚠️ Action Required:\nPlease review this candidate and choose an action below.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Approve",
+                    "additionalFields": {
+                      "callback_data": "={{ 'approve_' + $json.application_id }}"
+                    }
+                  },
+                  {
+                    "text": "❌ Reject",
+                    "additionalFields": {
+                      "callback_data": "={{ 'reject_' + $json.application_id }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        32,
+        -96
+      ],
+      "id": "7aef85e6-88c7-47c7-a7e5-6abc23ce55da",
+      "name": "Send HR Review Alert",
+      "webhookId": "hr-telegram-review-alert",
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram_bot_credentials_id",
+          "name": "Telegram HR Bot Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_DOCUMENT_ID",
+          "mode": "list",
+          "cachedResultName": "Candidates",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_DOCUMENT_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "application_id": "={{ $json.application_id }}",
+            "review_status": "PENDING",
+            "processed": "FALSE"
+          },
+          "matchingColumns": [
+            "application_id"
+          ],
+          "schema": [
+            {
+              "id": "application_id",
+              "displayName": "application_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "review_status",
+              "displayName": "review_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "processed",
+              "displayName": "processed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        32,
+        96
+      ],
+      "id": "cf3f707f-abba-4d38-9bcb-db47a36f154d",
+      "name": "Mark Candidate as Pending Review",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google_sheets_credentials_id",
+          "name": "Google Sheets HR Database"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "👩‍💼 Phase 6: HR Manual Review (Telegram System)\n\nGoal: Borderline Case Control\n\nLogic:\nSend candidate to Telegram\nInline buttons:\n✅ Approve\n❌ Reject\nHR makes decision directly from Telegram\n\nResult:\n➡️ Fast human-in-the-loop decision",
+        "height": 240,
+        "width": 384,
+        "color": "#BD2EA3"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        -64
+      ],
+      "id": "a05aaa38-9ba6-48f7-8ed1-6188f47da362",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Receive Review Candidate": {
+      "main": [
+        [
+          {
+            "node": "Mark Candidate as Pending Review",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send HR Review Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send HR Review Alert": {
+      "main": []
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}
+

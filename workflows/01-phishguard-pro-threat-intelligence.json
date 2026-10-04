@@ -1,0 +1,652 @@
+{
+  "name": "PhishGuard Pro — Automated Phishing Email Triage & Threat Intelligence Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1296,
+        -208
+      ],
+      "id": "2c53ea3b-35a1-492f-8901-90c042531113",
+      "name": "PhishGuard — Email Monitor",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail_oauth_credential_id",
+          "name": "Gmail Production Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const phishingKeywords = [\n  'urgent', 'immediately', 'right away', 'asap', 'time sensitive',\n  'act now', 'action required', 'immediate action', 'expires today',\n  'deadline', 'last chance', 'final warning', 'final notice',\n  'within 24 hours', 'within 48 hours', 'limited time',\n  'don\\'t delay', 'respond immediately', 'quick response needed',\n  'account suspended', 'account locked', 'account compromised',\n  'account verification', 'verify your account', 'confirm your identity',\n  'unusual activity', 'suspicious activity', 'unauthorized access',\n  'security alert', 'security warning', 'security notice',\n  'password expired', 'password reset', 'update your password',\n  'login attempt', 'failed login', 'breach detected',\n  'identity theft', 'fraud alert', 'unauthorized transaction',\n  'wire transfer', 'bank transfer', 'payment pending',\n  'invoice attached', 'outstanding payment', 'overdue invoice',\n  'refund pending', 'claim your refund', 'tax refund',\n  'prize winner', 'you have won', 'lottery winner',\n  'inheritance', 'beneficiary', 'unclaimed funds',\n  'bitcoin', 'cryptocurrency', 'investment opportunity',\n  'financial reward', 'bonus payment', 'compensation',\n  'click here', 'click below', 'click the link',\n  'log in here', 'sign in here', 'access your account',\n  'confirm your details', 'update your information',\n  'fill out the form', 'submit your details',\n  'enter your credentials', 'provide your password',\n  'social security number', 'ssn', 'credit card number',\n  'bank account number', 'routing number',\n  'helpdesk', 'it department', 'tech support',\n  'system administrator', 'admin team',\n  'payroll department', 'human resources',\n  'ceo', 'chief executive', 'managing director',\n  'on behalf of', 'authorized representative',\n  'see attached', 'open attachment', 'review attached',\n  'document enclosed', 'file attached', 'download attached',\n  'open the document', 'enable macros', 'enable content',\n  'enable editing', 'protected document', 'encrypted document',\n  'legal action', 'law enforcement', 'police report',\n  'court order', 'subpoena', 'arrest warrant',\n  'account closure', 'service termination', 'permanent ban',\n  'data loss', 'file deletion', 'account deletion',\n  'penalty', 'fine', 'prosecution',\n  'free gift', 'gift card', 'exclusive offer',\n  'special promotion', 'selected winner', 'congratulations',\n  'no cost', 'risk free', 'guaranteed',\n  'double your', 'earn money', 'work from home',\n  'this is not spam', 'this is not a scam',\n  'this is legitimate', 'trusted sender',\n  'do not share', 'confidential', 'private and confidential',\n  'for your eyes only', 'do not forward'\n];\n\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const subject = (item.json.headers?.subject || item.json.subject || '').toLowerCase();\n  const body = (item.json.headers?.text || item.json.headers?.html || item.json.text || item.json.snippet || '').toLowerCase();\n  const from = (item.json.headers?.from || item.json.from || '').toLowerCase();\n  const fullText = `${subject} ${body} ${from}`;\n  \n  const matchedKeywords = phishingKeywords.filter(keyword => \n    fullText.includes(keyword.toLowerCase())\n  );\n  \n  if (matchedKeywords.length > 0) {\n    results.push({\n      json: {\n        ...item.json,\n        phishguard: {\n          matchedKeywords: matchedKeywords,\n          keywordCount: matchedKeywords.length,\n          scanTimestamp: new Date().toISOString(),\n          initialRiskLevel: matchedKeywords.length >= 5\n            ? 'CRITICAL'\n            : matchedKeywords.length >= 3\n              ? 'HIGH'\n              : matchedKeywords.length >= 2\n                ? 'MEDIUM'\n                : 'LOW'\n        }\n      },\n      binary: item.binary\n    });\n  }\n}\n\nif (results.length === 0) {\n  return [];\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -928,
+        -208
+      ],
+      "id": "0a1cf18f-3d77-4f48-aebb-f2cdf43452f1",
+      "name": "PhishGuard — Keyword Scanner"
+    },
+    {
+      "parameters": {
+        "content": "## Phase 1: Email Ingestion & Keyword Scan",
+        "height": 288,
+        "width": 544,
+        "color": "#B84260"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1328,
+        -288
+      ],
+      "id": "3d9317ba-c05a-46c0-bb52-529efa4d53d1",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const json = item.json;\n  \n  const fromRaw = json.headers?.from || json.From || json.from || '';\n  const fromStr = typeof fromRaw === 'string' ? fromRaw : (fromRaw?.text || fromRaw?.address || String(fromRaw));\n  const subject = json.headers?.subject || json.Subject || json.subject || '';\n  const to = json.headers?.to || json.To || json.to || '';\n  const date = json.headers?.date || json.Date || json.date || '';\n  const messageId = json.headers?.['message-id'] || json.messageId || json.id || '';\n  \n  const fromEmailMatch = fromStr.match(/<([^>]+)>/);\n  const fromEmail = fromEmailMatch ? fromEmailMatch[1] : fromStr;\n  const fromName = fromStr.replace(/<[^>]+>/, '').trim();\n  \n  const senderDomain = fromEmail.includes('@') \n    ? fromEmail.split('@')[1].toLowerCase() \n    : 'unknown';\n  \n  const bodyText = json.text || json.snippet || json.body || '';\n  const bodyHtml = json.html || json.textHtml || '';\n  \n  const urlRegex = /https?:\\/\\/[^\\s<>\"')\\]]+/gi;\n  const bodyUrls = bodyText.match(urlRegex) || [];\n  const htmlUrls = bodyHtml.match(urlRegex) || [];\n  const allUrls = [...new Set([...bodyUrls, ...htmlUrls])];\n  \n  const suspiciousUrlIndicators = [\n    /bit\\.ly/i, /tinyurl/i, /goo\\.gl/i, /t\\.co/i,\n    /shortened/i, /redirect/i, /click\\./i,\n    /\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/,\n    /@/,\n    /\\.ru\\//i, /\\.cn\\//i, /\\.tk\\//i, /\\.ml\\//i, /\\.ga\\//i,\n    /\\.xyz\\//i, /\\.top\\//i, /\\.buzz\\//i, /\\.work\\//i,\n    /-login/i, /-verify/i, /-secure/i, /-account/i,\n    /signin/i, /log-?in/i, /security-?check/i,\n    /\\.php\\?/i\n  ];\n  \n  const urlAnalysis = allUrls.map(url => {\n    const isSuspicious = suspiciousUrlIndicators.some(pattern => \n      pattern.test(url)\n    );\n    return {\n      url: url,\n      domain: (() => {\n        try { return new URL(url).hostname; } \n        catch { return 'invalid'; }\n      })(),\n      isSuspicious: isSuspicious,\n      suspiciousReasons: suspiciousUrlIndicators\n        .filter(p => p.test(url))\n        .map(p => p.source)\n    };\n  });\n  \n  const attachments = [];\n  if (item.binary) {\n    for (const [key, binaryData] of Object.entries(item.binary)) {\n      if (key.startsWith('attachment_')) {\n        const filename = binaryData.fileName || 'unknown';\n        const ext = filename.split('.').pop().toLowerCase();\n        const dangerousExts = [\n          'exe','bat','cmd','com','scr','pif','vbs','vbe',\n          'js','jse','wsf','wsh','ps1','msi','dll','jar',\n          'hta','cpl','inf','reg','rgs','lnk','docm','xlsm',\n          'pptm','dotm','xltm','potm','ppam','sldm','iso','img'\n        ];\n        attachments.push({\n          filename: filename,\n          mimeType: binaryData.mimeType || 'unknown',\n          size: binaryData.fileSize || 0,\n          extension: ext,\n          isDangerous: dangerousExts.includes(ext),\n          binaryKey: key\n        });\n      }\n    }\n  }\n  \n  results.push({\n    json: {\n      emailId: messageId,\n      parsed: {\n        headers: {\n          from: fromRaw,\n          fromEmail: fromEmail,\n          fromName: fromName,\n          senderDomain: senderDomain,\n          to: to,\n          subject: subject,\n          date: date\n        },\n        body: {\n          text: bodyText,\n          html: bodyHtml,\n          length: bodyText.length\n        },\n        urls: {\n          all: allUrls,\n          count: allUrls.length,\n          suspicious: urlAnalysis.filter(u => u.isSuspicious),\n          suspiciousCount: urlAnalysis.filter(u => u.isSuspicious).length,\n          analysis: urlAnalysis\n        },\n        attachments: {\n          list: attachments,\n          count: attachments.length,\n          hasDangerous: attachments.some(a => a.isDangerous),\n          dangerousFiles: attachments.filter(a => a.isDangerous)\n        }\n      },\n      phishguard: json.phishguard\n    },\n    binary: item.binary\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        -208
+      ],
+      "id": "2a733718-afc1-4ef7-8d19-48d969ec3fc8",
+      "name": "PhishGuard — Email Parser"
+    },
+    {
+      "parameters": {
+        "content": "## Phase 2: Email Parser",
+        "height": 288,
+        "width": 192,
+        "color": "#2A68CB"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -768,
+        -288
+      ],
+      "id": "2c665d95-8b48-4d5f-ac1d-a0a0201ed795",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "command": "=echo \"=== WHOIS ===\" && whois {{ $json.parsed.headers.senderDomain }} | head -30 && echo \"=== DIG ===\" && dig {{ $json.parsed.headers.senderDomain }} ANY +short && echo \"=== NSLOOKUP MX ===\" && nslookup -type=mx {{ $json.parsed.headers.senderDomain }} && echo \"=== SPF CHECK ===\" && dig {{ $json.parsed.headers.senderDomain }} TXT +short | grep -i spf && echo \"=== DMARC CHECK ===\" && dig _dmarc.{{ $json.parsed.headers.senderDomain }} TXT +short"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -304,
+        -752
+      ],
+      "id": "e91e0fdf-12e1-4ba2-948c-30695a9bd627",
+      "name": "PhishGuard — Header Analyzer",
+      "credentials": {
+        "sshPassword": {
+          "id": "ssh_credentials_id",
+          "name": "SSH Kali Environment"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.parsed.urls.all.length > 0 ? 'echo \"=== CURL REDIRECT TRACE ===\" && curl -sIL -o /dev/null -w \"URL: %{url_effective}\\nHTTP Code: %{http_code}\\nRedirects: %{num_redirects}\\nFinal URL: %{url_effective}\\nTime: %{time_total}s\\n\" \"' + $json.parsed.urls.all[0] + '\" && echo \"=== WHOIS URL DOMAIN ===\" && whois ' + ($json.parsed.urls.analysis[0]?.domain || 'unknown') + ' | head -20 && echo \"=== DIG URL DOMAIN ===\" && dig ' + ($json.parsed.urls.analysis[0]?.domain || 'unknown') + ' A +short' : 'echo \"NO_URLS_FOUND\"' }}"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        -208
+      ],
+      "id": "3e1e10e8-0c96-4b27-a7c7-2c827361c8e5",
+      "name": "PhishGuard — URL Analyzer",
+      "credentials": {
+        "sshPassword": {
+          "id": "ssh_credentials_id",
+          "name": "SSH Kali Environment"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.virustotal.com/api/v3/urls",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "virusTotalApi",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $('PhishGuard — Email Parser').first().json.parsed.urls.all[0] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -208,
+        -208
+      ],
+      "id": "b13cb4da-8524-4660-9736-bf6cb73f3dbf",
+      "name": "PhishGuard — VT URL Check",
+      "extendsCredential": "virusTotalApi",
+      "credentials": {
+        "virusTotalApi": {
+          "id": "vt_api_credentials_id",
+          "name": "VirusTotal API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.data.links.self }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "virusTotalApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        -208
+      ],
+      "id": "5539db44-f3ad-439f-873b-a03ab609e0f0",
+      "name": "PhishGuard — VT URL Report",
+      "extendsCredential": "virusTotalApi",
+      "credentials": {
+        "virusTotalApi": {
+          "id": "vt_api_credentials_id",
+          "name": "VirusTotal API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\n\nlet vtData = {};\ntry {\n  vtData = $('PhishGuard — VT URL Report').first().json.data || {};\n} catch (e) {\n  vtData = {};\n}\nconst stats = vtData.attributes?.stats || {};\n\nlet urlAnalyzerOutput = '';\ntry {\n  urlAnalyzerOutput = $('PhishGuard — URL Analyzer').first().json.stdout || '';\n} catch (e) {\n  urlAnalyzerOutput = '';\n}\n\nlet dnstwistOutput = '';\ntry {\n  dnstwistOutput = $('PhishGuard — dnstwist').first().json.stdout || '';\n} catch (e) {\n  dnstwistOutput = 'dnstwist data not available';\n}\n\nconst redirectMatch = urlAnalyzerOutput.match(/Redirects:\\s*(\\d+)/);\nconst finalUrlMatch = urlAnalyzerOutput.match(/Final URL:\\s*(.+?)\\\\n/);\nconst httpCodeMatch = urlAnalyzerOutput.match(/HTTP Code:\\s*(\\d+)/);\n\nlet urlScore = 0;\nconst malicious = stats.malicious || 0;\nconst suspicious = stats.suspicious || 0;\n\nif (malicious >= 5) urlScore += 25;\nelse if (malicious >= 3) urlScore += 20;\nelse if (malicious >= 1) urlScore += 15;\n\nif (suspicious >= 3) urlScore += 5;\nelse if (suspicious >= 1) urlScore += 3;\n\nconst redirects = redirectMatch ? parseInt(redirectMatch[1]) : 0;\nif (redirects >= 3) urlScore += 5;\nelse if (redirects >= 1) urlScore += 2;\n\nconst urlRisks = [];\nif (malicious > 0) urlRisks.push(`${malicious} engines flagged URL as malicious`);\nif (suspicious > 0) urlRisks.push(`${suspicious} engines flagged URL as suspicious`);\nif (redirects >= 3) urlRisks.push(`URL has ${redirects} redirects (evasion technique)`);\n\nconst dnstwistResults = {\n  scanned: false,\n  typosquatDomains: [],\n  registeredCount: 0\n};\n\nif (!dnstwistOutput.includes('not available') && !dnstwistOutput.includes('NO_URLS')) {\n  dnstwistResults.scanned = true;\n  const lines = dnstwistOutput.split('\\n').filter(l => l.trim().length > 0);\n  for (const line of lines) {\n    const parts = line.split(',');\n    if (parts.length >= 2 && parts[0] !== 'fuzzer') {\n      const fuzzer = parts[0] || '';\n      const domain = parts[1] || '';\n      const dnsA = parts[2] || '';\n      if (domain && domain !== '*original*' && dnsA) {\n        dnstwistResults.typosquatDomains.push({ type: fuzzer, domain: domain, ip: dnsA });\n        dnstwistResults.registeredCount++;\n      }\n    }\n  }\n  if (dnstwistResults.registeredCount > 10) {\n    urlRisks.push(`${dnstwistResults.registeredCount} typosquat domains found with DNS records — high phishing risk`);\n    urlScore += 5;\n  } else if (dnstwistResults.registeredCount > 3) {\n    urlRisks.push(`${dnstwistResults.registeredCount} typosquat domains found`);\n    urlScore += 3;\n  }\n}\n\nconst parsedData = $('PhishGuard — Email Parser').first().json.parsed;\nconst suspiciousUrls = parsedData.urls.suspicious || [];\nif (suspiciousUrls.length > 0) {\n  urlScore += 5;\n  urlRisks.push(`${suspiciousUrls.length} URLs match suspicious patterns`);\n}\n\nurlScore = Math.min(urlScore, 25);\n\nresults.push({\n  json: {\n    urlAnalysis: {\n      virusTotal: {\n        malicious: malicious,\n        suspicious: suspicious,\n        harmless: stats.harmless || 0,\n        undetected: stats.undetected || 0,\n        analysisId: vtData.id || '',\n        analysisDate: vtData.attributes?.date || null\n      },\n      redirects: {\n        count: redirects,\n        finalUrl: finalUrlMatch ? finalUrlMatch[1] : 'unknown',\n        httpCode: httpCodeMatch ? parseInt(httpCodeMatch[1]) : 0\n      },\n      dnstwist: dnstwistResults,\n      suspiciousPatterns: suspiciousUrls,\n      risks: urlRisks,\n      urlScore: urlScore\n    },\n    emailId: $('PhishGuard — Email Parser').first().json.emailId,\n    parsed: parsedData,\n    phishguard: $('PhishGuard — Email Parser').first().json.phishguard\n  }\n});\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        -96
+      ],
+      "id": "87e256f0-a3c5-4f19-a092-6d3ebded0bb4",
+      "name": "PhishGuard — URL Parser"
+    },
+    {
+      "parameters": {
+        "content": "## Phase 3A: Header & Domain Intelligence\nSSH to Kali: whois, dig, nslookup, SPF/DKIM/DMARC validation.",
+        "height": 544,
+        "width": 512,
+        "color": "#07B64A"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        -880
+      ],
+      "id": "61e755f9-72bd-4601-ae83-3e02e0a52131",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Phase 3B: URL Intelligence\nSSH curl redirect trace + VirusTotal API scan. Detects malicious URLs, redirects, suspicious patterns.",
+        "height": 480,
+        "width": 912,
+        "color": "#E3DB0D"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        -304
+      ],
+      "id": "8de1ce99-d729-4a6d-a4d8-76f4a02aa5a7",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const parsed = item.json.parsed;\n  const attachments = parsed.attachments.list || [];\n  \n  if (attachments.length === 0) {\n    results.push({\n      json: {\n        attachmentAnalysis: {\n          hasAttachments: false,\n          totalFiles: 0,\n          scannedFiles: [],\n          risks: [],\n          attachmentScore: 0,\n          summary: 'No attachments found in email'\n        },\n        emailId: item.json.emailId,\n        parsed: parsed,\n        phishguard: item.json.phishguard\n      }\n    });\n    continue;\n  }\n  \n  const scannedFiles = [];\n  const risks = [];\n  let attachmentScore = 0;\n  \n  for (const att of attachments) {\n    const fileInfo = {\n      filename: att.filename,\n      extension: att.extension,\n      mimeType: att.mimeType,\n      size: att.size,\n      isDangerous: att.isDangerous,\n      riskFactors: []\n    };\n    if (att.isDangerous) {\n      fileInfo.riskFactors.push(`Dangerous file extension: .${att.extension}`);\n      attachmentScore += 15;\n    }\n    if (att.filename.split('.').length > 2) {\n      fileInfo.riskFactors.push('Double extension detected (possible disguise)');\n      attachmentScore += 10;\n    }\n    if (fileInfo.riskFactors.length > 0) {\n      risks.push(...fileInfo.riskFactors);\n    }\n    scannedFiles.push(fileInfo);\n  }\n  attachmentScore = Math.min(attachmentScore, 25);\n  \n  results.push({\n    json: {\n      attachmentAnalysis: {\n        hasAttachments: true,\n        totalFiles: attachments.length,\n        scannedFiles: scannedFiles,\n        hasDangerous: attachments.some(a => a.isDangerous),\n        risks: risks,\n        attachmentScore: attachmentScore,\n        summary: `${attachments.length} attachment(s) found`\n      },\n      emailId: item.json.emailId,\n      parsed: parsed,\n      phishguard: item.json.phishguard\n    },\n    binary: item.binary\n  });\n}\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        368
+      ],
+      "id": "84451e9d-7f6e-46e5-9595-514ec5945ce7",
+      "name": "PhishGuard — Attachment Analyzer"
+    },
+    {
+      "parameters": {
+        "command": "=theHarvester -d {{ $json.parsed.headers.senderDomain }} -b anubis,crtsh,dnsdumpster,hackertarget,rapiddns,sublist3r,urlscan -l 50 2>/dev/null | head -80 || echo \"theHarvester scan completed with errors\""
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -304,
+        -560
+      ],
+      "id": "21e31fdd-02af-43f7-8ce8-02859162cead",
+      "name": "PhishGuard — theHarvester",
+      "credentials": {
+        "sshPassword": {
+          "id": "ssh_credentials_id",
+          "name": "SSH Kali Environment"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\nconst headerAnalyzerOutput = $('PhishGuard — Header Analyzer').first().json.stdout || '';\nlet theHarvesterOutput = '';\ntry {\n  theHarvesterOutput = $('PhishGuard — theHarvester').first().json.stdout || '';\n} catch (e) {\n  theHarvesterOutput = '';\n}\n\nconst whoisSection = headerAnalyzerOutput.split('=== DIG ===')[0] || '';\nconst whoisData = {};\nconst whoisFields = ['Domain Name', 'Registrar', 'Creation Date', 'Registry Expiry Date'];\nfor (const field of whoisFields) {\n  const match = whoisSection.match(new RegExp(`${field}:\\s*(.+?)\\\\n`, 'i'));\n  if (match) whoisData[field] = match[1].trim();\n}\n\nlet domainAgeDays = null;\nif (whoisData['Creation Date']) {\n  const created = new Date(whoisData['Creation Date']);\n  if (!isNaN(created)) {\n    domainAgeDays = Math.floor((Date.now() - created) / (1000 * 60 * 60 * 24));\n  }\n}\n\nconst spfSection = headerAnalyzerOutput.split('=== SPF CHECK ===')[1]?.split('=== DMARC')[0] || '';\nconst hasSPF = spfSection.toLowerCase().includes('v=spf1');\nconst dmarcSection = headerAnalyzerOutput.split('=== DMARC CHECK ===')[1] || '';\nconst hasDMARC = dmarcSection.toLowerCase().includes('v=dmarc');\n\nlet headerScore = 0;\nconst headerRisks = [];\nif (domainAgeDays !== null && domainAgeDays < 30) { headerScore += 15; headerRisks.push('Domain registered < 30 days ago'); }\nif (!hasSPF) { headerScore += 5; headerRisks.push('No SPF record found'); }\nif (!hasDMARC) { headerScore += 5; headerRisks.push('No DMARC record found'); }\n\nresults.push({\n  json: {\n    headerAnalysis: {\n      whois: whoisData,\n      domainAgeDays: domainAgeDays,\n      spf: { found: hasSPF, record: spfSection.trim() },\n      dmarc: { found: hasDMARC, record: dmarcSection.trim() },\n      risks: headerRisks,\n      headerScore: headerScore\n    },\n    emailId: $('PhishGuard — Email Parser').first().json.emailId,\n    parsed: $('PhishGuard — Email Parser').first().json.parsed,\n    phishguard: $('PhishGuard — Email Parser').first().json.phishguard\n  }\n});\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        -640
+      ],
+      "id": "8698f4c8-252a-4394-bb02-d1695f4a1766",
+      "name": "PhishGuard — Header and theHarvester Parser"
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.parsed.urls.all.length > 0 ? 'dnstwist --format csv ' + $json.parsed.headers.senderDomain + ' 2>/dev/null | head -30 || echo \"dnstwist not available\"' : 'echo \"NO_URLS\"' }}"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        0
+      ],
+      "id": "a9246b8e-68a8-434e-9efc-886eae04b903",
+      "name": "PhishGuard — dnstwist",
+      "credentials": {
+        "sshPassword": {
+          "id": "ssh_credentials_id",
+          "name": "SSH Kali Environment"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Phase 3C: Attachment Intelligence",
+        "height": 464,
+        "width": 976,
+        "color": "#62008F"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        208
+      ],
+      "id": "156fda94-1296-4b78-96ae-0666b7d41e2f",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "jsCode": "let headerData = {};\ntry { headerData = $('PhishGuard — Header and theHarvester Parser').first().json; } catch (e) { headerData = { headerAnalysis: { headerScore: 0, risks: [] } }; }\nlet urlData = {};\ntry { urlData = $('PhishGuard — URL Parser').first().json; } catch (e) { urlData = { urlAnalysis: { urlScore: 0, risks: [] } }; }\nlet attachmentData = {};\ntry { attachmentData = $('PhishGuard — Attachment Parser').first().json; } catch (e) { attachmentData = { attachmentAnalysis: { attachmentScore: 0, risks: [] } }; }\n\nconst headerScore = headerData.headerAnalysis?.headerScore || 0;\nconst urlScore = urlData.urlScore || urlData.urlAnalysis?.urlScore || 0;\nconst attachmentScore = attachmentData.attachmentAnalysis?.attachmentScore || 0;\nconst keywordCount = headerData.phishguard?.keywordCount || 0;\n\nlet keywordScore = 0;\nif (keywordCount >= 5) keywordScore = 25;\nelse if (keywordCount >= 3) keywordScore = 15;\nelse if (keywordCount >= 2) keywordScore = 10;\nelse if (keywordCount >= 1) keywordScore = 5;\n\nconst totalScore = Math.min(keywordScore + headerScore + urlScore + attachmentScore, 100);\nlet threatLevel = 'LOW';\nif (totalScore >= 70) threatLevel = 'CRITICAL';\nelse if (totalScore >= 50) threatLevel = 'HIGH';\nelse if (totalScore >= 30) threatLevel = 'MEDIUM';\n\nconst allRisks = [\n  ...(headerData.headerAnalysis?.risks || []),\n  ...(urlData.urlAnalysis?.risks || []),\n  ...(attachmentData.attachmentAnalysis?.risks || [])\n];\n\nreturn [{\n  json: {\n    threatAssessment: {\n      totalScore: totalScore,\n      threatLevel: threatLevel,\n      breakdown: { keywordScore, headerScore, urlScore, attachmentScore },\n      allRisks: allRisks\n    },\n    emailSummary: {\n      from: headerData.parsed?.headers?.from || '',\n      fromEmail: headerData.parsed?.headers?.fromEmail || '',\n      senderDomain: headerData.parsed?.headers?.senderDomain || '',\n      subject: headerData.parsed?.headers?.subject || '',\n      to: headerData.parsed?.headers?.to || '',\n      date: headerData.parsed?.headers?.date || '',\n      urlCount: headerData.parsed?.urls?.count || 0,\n      attachmentCount: headerData.parsed?.attachments?.count || 0\n    },\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        -96
+      ],
+      "id": "766b2822-36dc-44e2-a6de-9affcc421b1a",
+      "name": "PhishGuard — Merge Results"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze this threat:\nSender: {{ $json.emailSummary.fromEmail }}\nSubject: {{ $json.emailSummary.subject }}\nTotal Threat Score: {{ $json.threatAssessment.totalScore }}/100\nThreat Level: {{ $json.threatAssessment.threatLevel }}\nRisks: {{ $json.threatAssessment.allRisks }}\n\nProvide analysis in exact format:\nVERDICT: [PHISHING / SUSPICIOUS / LEGITIMATE]\nCONFIDENCE: [HIGH / MEDIUM / LOW]\nSOCIAL_ENGINEERING_TACTICS: [Tactics]\nTECHNICAL_INDICATORS: [Indicators]\nRECOMMENDATION: [Action]\nEXECUTIVE_SUMMARY: [Summary]",
+        "options": {
+          "systemMessage": "You are PhishGuard AI SOC Analyst. Output strictly the requested format without fluff."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1104,
+        -96
+      ],
+      "id": "fe885544-2289-4a27-85b1-e962c94bda46",
+      "name": "PhishGuard — AI Threat Analyst"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-5-20250929",
+          "cachedResultName": "Claude Sonnet 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        976,
+        112
+      ],
+      "id": "01ac8a88-7bc8-4952-a3b9-7e87bd771bd7",
+      "name": "Anthropic Chat Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "anthropic_credentials_id",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst aiOutput = items[0]?.json?.output || '';\nlet mergeData = {};\ntry { mergeData = $('PhishGuard — Merge Results').first().json; } catch (e) { mergeData = {}; }\n\nconst parseField = (text, field) => {\n  const match = text.match(new RegExp(`${field}:\\s*([\\s\\S]*?)(?=\\n[A-Z_]+:|$)`, 'i'));\n  return match ? match[1].trim() : 'N/A';\n};\n\nconst verdict = parseField(aiOutput, 'VERDICT');\nconst confidence = parseField(aiOutput, 'CONFIDENCE');\nlet finalScore = mergeData.threatAssessment?.totalScore || 30;\nlet finalThreatLevel = mergeData.threatAssessment?.threatLevel || 'MEDIUM';\n\nif (verdict.includes('PHISHING') && confidence.includes('HIGH')) {\n  finalScore = Math.max(finalScore, 75);\n  finalThreatLevel = 'CRITICAL';\n}\n\nreturn [{\n  json: {\n    finalVerdict: { aiVerdict: verdict, aiConfidence: confidence, finalScore, finalThreatLevel },\n    aiAnalysis: { \n      socialEngineering: parseField(aiOutput, 'SOCIAL_ENGINEERING_TACTICS'),\n      technicalIndicators: parseField(aiOutput, 'TECHNICAL_INDICATORS'),\n      recommendation: parseField(aiOutput, 'RECOMMENDATION'),\n      executiveSummary: parseField(aiOutput, 'EXECUTIVE_SUMMARY')\n    },\n    emailSummary: mergeData.emailSummary,\n    threatAssessment: mergeData.threatAssessment,\n    timestamp: mergeData.timestamp\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        -96
+      ],
+      "id": "6688f3e0-3c28-4ec3-80df-235b2e56c427",
+      "name": "PhishGuard — AI Report Parser"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8ea0fbc3-1a9e-47cf-b6d1-8a8e56d34f75",
+              "leftValue": "={{ $('PhishGuard — AI Report Parser').first().json.finalVerdict.finalScore }}",
+              "rightValue": 70,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2592,
+        -96
+      ],
+      "id": "3cedca09-8bc1-44c1-b757-913ceba1bb3f",
+      "name": "PhishGuard — Threat Router"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.html2pdf.app/v1/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "html",
+              "value": "={{ $json.htmlReport }}"
+            },
+            {
+              "name": "apiKey",
+              "value": "YOUR_HTML2PDF_API_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2144,
+        -96
+      ],
+      "id": "d7bf151e-9fda-4b53-8772-0c7db1d1ab8a",
+      "name": "PhishGuard - Convert to PDF"
+    },
+    {
+      "parameters": {
+        "sendTo": "security-alerts@example.com",
+        "subject": "=🔴 PhishGuard CRITICAL ALERT: Score {{ $('PhishGuard — AI Report Parser').first().json.finalVerdict.finalScore }}/100",
+        "message": "=Critical Threat Detected. Review attached report immediately.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2944,
+        -256
+      ],
+      "id": "1d3ebfef-fa39-41ad-8e1c-ea2d1ba709f0",
+      "name": "PhishGuard — Critical Alert",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail_credentials_id",
+          "name": "Gmail Production Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "indexId": "phishguard-alerts",
+        "dataToSend": "autoMapInputData",
+        "additionalFields": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.elasticsearch",
+      "typeVersion": 1,
+      "position": [
+        3520,
+        -128
+      ],
+      "id": "5c09b96e-b481-4e07-86d6-a11182cfd096",
+      "name": "PhishGuard — Elastic SIEM Alert",
+      "credentials": {
+        "elasticsearchApi": {
+          "id": "elastic_credentials_id",
+          "name": "Elasticsearch Production Cluster"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "PhishGuard — Email Monitor": {
+      "main": [
+        [
+          {
+            "node": "PhishGuard — Keyword Scanner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PhishGuard — Keyword Scanner": {
+      "main": [
+        [
+          {
+            "node": "PhishGuard — Email Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PhishGuard — Email Parser": {
+      "main": [
+        [
+          {
+            "node": "PhishGuard — Header Analyzer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PhishGuard — URL Analyzer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PhishGuard — Attachment Analyzer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PhishGuard — theHarvester",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PhishGuard — dnstwist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PhishGuard — URL Analyzer": {
+      "main": [
+        [
+          {
+            "node": "PhishGuard — VT URL Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PhishGuard — VT URL Check": {
+      "main": [
+        [
+          {
+            "node": "PhishGuard — VT URL Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PhishGuard — VT URL Report": {
+      "main": [
+        [
+          {
+            "node": "PhishGuard — URL Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PhishGuard — Merge Results": {
+      "main": [
+        [
+          {
+            "node": "PhishGuard — AI Threat Analyst",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "PhishGuard — AI Threat Analyst",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PhishGuard — AI Threat Analyst": {
+      "main": [
+        [
+          {
+            "node": "PhishGuard — AI Report Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PhishGuard — AI Report Parser": {
+      "main": [
+        [
+          {
+            "node": "PhishGuard — Threat Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PhishGuard — Threat Router": {
+      "main": [
+        [
+          {
+            "node": "PhishGuard — Critical Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "PhishGuard — Critical Alert": {
+      "main": [
+        [
+          {
+            "node": "PhishGuard — Elastic SIEM Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
